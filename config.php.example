@@ -1,0 +1,54 @@
+<?php
+/**
+ * Database configuration file
+ * Supports multiple databases with a default configuration
+ * 
+ * Usage:
+ * - "db_name" => [] - uses default config, overrides only specified keys
+ * - "db_name" => "string" => [] - same as above, "string" is just a label
+ */
+
+// Hardcoded authentication credentials - multiple tokens with names/descriptions
+$auth = [
+    'admin' => 'admin-token-123',
+    'app' => 'app-token-456',
+    'test' => 'test-token-789',
+];
+
+// Default database configuration
+$default = [
+    'host' => 'localhost',
+    'port' => 3306,
+    'database' => '.....',
+    'username' => 'root',
+    'password' => '',
+    'charset' => 'utf8mb4',
+    'driver' => 'auto',
+    'options' => [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+    ]
+];
+
+// Named database configurations (override default settings)
+$databases = [
+    // Merge with default config
+    's' => [],
+
+    'sakila' => [
+        'host' => 'localhost',
+        'port' => 3306,
+        'database' => 'sakila',
+        'username' => 'pma',
+        'password' => 'pma',
+        'charset' => 'utf8mb4',
+        'driver' => 'mysqli',
+    ],
+];
+
+return [
+    'auth' => $auth,
+    'default' => $default,
+    'databases' => $databases,
+];
