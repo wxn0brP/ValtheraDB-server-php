@@ -7,25 +7,27 @@
  * Get database configuration by name
  * Returns merged config (default + named config overrides)
  */
-function getDbConfig(?string $dbName = null): array {
+function getDbConfig(?string $dbName = null): array
+{
     $configFile = __DIR__ . '/../config.php';
     if (!file_exists($configFile)) {
         throw new Exception("Configuration file not found: {$configFile}");
     }
-    
+
     $config = require $configFile;
-    
+
     if ($dbName === null || !isset($config[$dbName])) {
         return $config['default'];
     }
-    
+
     return array_merge($config['default'], $config[$dbName]);
 }
 
 /**
  * Escape identifier (table/column name) based on database type
  */
-function escapeIdentifier(string $name, string $type): string {
+function escapeIdentifier(string $name, string $type): string
+{
     if ($type === "postgres") {
         return '"' . str_replace('"', '""', $name) . '"';
     }
@@ -35,7 +37,8 @@ function escapeIdentifier(string $name, string $type): string {
 /**
  * Generate a unique ID (similar to MongoDB ObjectId style)
  */
-function genId(): string {
+function genId(): string
+{
     return bin2hex(random_bytes(12));
 }
 
@@ -43,11 +46,12 @@ function genId(): string {
  * Bind parameters to mysqli statement
  * Helper for MySQLi driver
  */
-function bindParams(mysqli_stmt $stmt, array $params): void {
+function bindParams(mysqli_stmt $stmt, array $params): void
+{
     if (empty($params)) {
         return;
     }
-    
+
     $types = '';
     foreach ($params as $param) {
         if (is_int($param)) {
@@ -58,7 +62,7 @@ function bindParams(mysqli_stmt $stmt, array $params): void {
             $types .= 's';
         }
     }
-    
+
     $stmt->bind_param($types, ...$params);
 }
 
@@ -67,7 +71,8 @@ function bindParams(mysqli_stmt $stmt, array $params): void {
  * For POST with JSON: expects {"db": "dbName", "params": [{...}]}
  * For GET: uses query parameters directly
  */
-function getRequestParams(): array {
+function getRequestParams(): array
+{
     $params = [];
     $dbName = null;
 
@@ -117,7 +122,8 @@ function getRequestParams(): array {
 /**
  * Get a specific parameter from request
  */
-function getParam(string $key, $default = null) {
+function getParam(string $key, $default = null)
+{
     $params = getRequestParams();
     return $params[$key] ?? $default;
 }
@@ -126,33 +132,34 @@ function getParam(string $key, $default = null) {
  * Build WHERE clause from search parameters (key == value only)
  * Returns array with [sql_clause, params_array]
  */
-function buildWhereClause(array $search, string $tableAlias = ''): array {
+function buildWhereClause(array $search, string $tableAlias = ''): array
+{
     $conditions = [];
     $params = [];
-    
+
     foreach ($search as $key => $value) {
         // Skip special operators (starting with $)
         if (str_starts_with($key, '$')) {
             continue;
         }
-        
+
         // Skip nested objects/arrays (advanced search not supported)
         if (is_array($value) || is_object($value)) {
             continue;
         }
-        
+
         // Skip null values
         if ($value === null) {
             continue;
         }
-        
+
         $column = $tableAlias ? "{$tableAlias}.`{$key}`" : "`{$key}`";
         $conditions[] = "{$column} = ?";
         $params[] = $value;
     }
-    
+
     $whereClause = !empty($conditions) ? 'WHERE ' . implode(' AND ', $conditions) : '';
-    
+
     return [$whereClause, $params];
 }
 
@@ -160,7 +167,8 @@ function buildWhereClause(array $search, string $tableAlias = ''): array {
  * Send JSON response in standardized format
  * Format: { err: boolean, result: any } - result contains the data on success
  */
-function jsonResponse(array $data, int $statusCode = 200): void {
+function jsonResponse($data, int $statusCode = 200): void
+{
     http_response_code($statusCode);
     header('Content-Type: application/json');
     echo json_encode(['err' => false, 'result' => $data], JSON_PRETTY_PRINT);
@@ -171,7 +179,8 @@ function jsonResponse(array $data, int $statusCode = 200): void {
  * Send error response in standardized format
  * Format: { err: boolean, msg: string } - msg contains error message
  */
-function errorResponse(string $message, int $statusCode = 400): void {
+function errorResponse(string $message, int $statusCode = 400): void
+{
     http_response_code($statusCode);
     header('Content-Type: application/json');
     echo json_encode(['err' => true, 'msg' => $message], JSON_PRETTY_PRINT);
@@ -181,7 +190,8 @@ function errorResponse(string $message, int $statusCode = 400): void {
 /**
  * Validate required fields in data
  */
-function validateRequired(array $data, array $requiredFields): array {
+function validateRequired(array $data, array $requiredFields): array
+{
     $errors = [];
     foreach ($requiredFields as $field) {
         if (!isset($data[$field])) {
@@ -189,4 +199,9 @@ function validateRequired(array $data, array $requiredFields): array {
         }
     }
     return $errors;
+}
+
+function convertSqlAndParamsToString(string $sql, array $params): string
+{
+    return vsprintf($sql, $params);
 }

@@ -1,323 +1,133 @@
 <?php
-/**
- * Database connection utility
- * Supports both PDO and MySQLi drivers
- * Provides singleton database connections with support for multiple databases
- */
+$_DB_CONN = null;
+$_DB_DRIVER = null; // pdo | mysqli
 
-class Database {
-    private static array $instances = [];
-    private static ?array $config = null;
-    private static ?string $lastSql = null;
+function db_init(array $config): void
+{
+    global $_DB_CONN;
+    global $_DB_DRIVER;
 
-    /**
-     * Get the last executed SQL query
-     */
-    public static function getLastSql(): ?string {
-        return self::$lastSql;
+    if ($_DB_CONN !== null)
+        return;
+
+    $driver = $config['driver'] ?? 'auto';
+
+    if ($driver === 'auto') {
+        $driver = class_exists('PDO') && in_array('mysql', PDO::getAvailableDrivers()) ? 'pdo' : 'mysqli';
     }
 
-    /**
-     * Load configuration from config.php
-     */
-    private static function loadConfig(): array {
-        if (self::$config === null) {
-            $configFile = __DIR__ . '/../config.php';
-            if (!file_exists($configFile)) {
-                throw new Exception("Configuration file not found: {$configFile}");
-            }
-            self::$config = require $configFile;
-        }
-        return self::$config;
-    }
+    $_DB_DRIVER = $driver;
 
-    /**
-     * Get configuration for a specific database
-     */
-    private static function getDbConfig(?string $dbName = null): array {
-        $config = self::loadConfig();
-
-        if ($dbName === null) {
-            throw new Exception("Database name not specified");
-        }
-
-        if (!isset($config['databases'][$dbName])) {
-            throw new Exception("Database configuration not found: {$dbName}");
-        }
-
-        return array_merge($config['default'], $config['databases'][$dbName]);
-    }
-
-    /**
-     * Detect available database driver
-     */
-    private static function detectDriver(string $driver): string {
-        if ($driver !== 'auto') {
-            return $driver;
-        }
-
-        if (class_exists('PDO') && in_array('mysql', PDO::getAvailableDrivers())) {
-            return 'pdo';
-        } elseif (class_exists('mysqli')) {
-            return 'mysqli';
-        } else {
-            throw new Exception("No database driver available (PDO or MySQLi required)");
-        }
-    }
-
-    /**
-     * Get singleton database connection for a specific database
-     */
-    public static function getConnection(?string $dbName = null): PDO|mysqli {
-        $configKey = $dbName ?? 'default';
-        
-        if (!isset(self::$instances[$configKey])) {
-            $dbConfig = self::getDbConfig($dbName);
-            $driver = self::detectDriver($dbConfig['driver'] ?? 'auto');
-
-            if ($driver === 'pdo') {
-                self::$instances[$configKey] = self::createPDOConnection($dbConfig);
-            } else {
-                self::$instances[$configKey] = self::createMySQLiConnection($dbConfig);
-            }
-        }
-
-        return self::$instances[$configKey];
-    }
-
-    /**
-     * Create PDO connection
-     */
-    private static function createPDOConnection(array $config): PDO {
+    if ($driver === 'pdo') {
         $dsn = sprintf(
             "mysql:host=%s;port=%d;dbname=%s;charset=%s",
             $config['host'],
-            $config['port'],
+            $config['port'] ?? 3306,
             $config['database'],
-            $config['charset']
+            $config['charset'] ?? 'utf8mb4'
         );
-
-        $pdo = new PDO(
-            $dsn,
-            $config['username'],
-            $config['password'],
-            $config['options'] ?? [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES => false,
-            ]
-        );
-
-        return $pdo;
-    }
-
-    /**
-     * Create MySQLi connection
-     */
-    private static function createMySQLiConnection(array $config): mysqli {
-        $mysqli = new mysqli(
+        $_DB_CONN = new PDO($dsn, $config['username'], $config['password'], [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false,
+        ]);
+    } else {
+        mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+        $_DB_CONN = new mysqli(
             $config['host'],
             $config['username'],
             $config['password'],
             $config['database'],
-            $config['port']
+            $config['port'] ?? 3306
         );
-
-        if ($mysqli->connect_error) {
-            throw new Exception("Connection failed: " . $mysqli->connect_error);
-        }
-
-        $mysqli->set_charset($config['charset']);
-        return $mysqli;
-    }
-
-    /**
-     * Check if using PDO for a specific database
-     */
-    public static function isPDO(?string $dbName = null): bool {
-        return self::getConnection($dbName) instanceof PDO;
-    }
-
-    /**
-     * Execute a prepared statement with given parameters
-     */
-    public static function execute(string $sql, array $params = [], ?string $dbName = null): DatabaseResult {
-        self::$lastSql = self::interpolateQuery($sql, $params);
-        $conn = self::getConnection($dbName);
-
-        if ($conn instanceof PDO) {
-            $stmt = $conn->prepare($sql);
-            $stmt->execute($params);
-            return new DatabaseResult($stmt, 'pdo');
-        } else {
-            $stmt = $conn->prepare($sql);
-            if (!$stmt) {
-                throw new Exception("Prepare failed: " . $conn->error);
-            }
-
-            if (!empty($params)) {
-                $types = '';
-                $values = [];
-                foreach ($params as $param) {
-                    if (is_int($param)) {
-                        $types .= 'i';
-                    } elseif (is_float($param)) {
-                        $types .= 'd';
-                    } else {
-                        $types .= 's';
-                    }
-                    $values[] = $param;
-                }
-                $stmt->bind_param($types, ...$values);
-            }
-
-            $stmt->execute();
-            return new DatabaseResult($stmt, 'mysqli');
-        }
-    }
-
-    /**
-     * Fetch all results from a query
-     */
-    public static function fetchAll(string $sql, array $params = [], ?string $dbName = null): array {
-        return self::execute($sql, $params, $dbName)->fetchAll();
-    }
-
-    /**
-     * Fetch single row from a query
-     */
-    public static function fetchOne(string $sql, array $params = [], ?string $dbName = null): ?array {
-        $result = self::execute($sql, $params, $dbName)->fetch();
-        return $result ?: null;
-    }
-
-    /**
-     * Get last inserted ID
-     */
-    public static function lastInsertId(?string $dbName = null): string {
-        $conn = self::getConnection($dbName);
-
-        if ($conn instanceof PDO) {
-            return $conn->lastInsertId();
-        } else {
-            return $conn->insert_id;
-        }
-    }
-
-    /**
-     * Get affected rows count
-     */
-    public static function affectedRows(?string $dbName = null): int {
-        $conn = self::getConnection($dbName);
-
-        if ($conn instanceof PDO) {
-            return $conn->rowCount();
-        } else {
-            return $conn->affected_rows;
-        }
-    }
-
-    /**
-     * Check if table/collection exists
-     */
-    public static function tableExists(string $table, ?string $dbName = null): bool {
-        $sql = "SHOW TABLES LIKE ?";
-        $result = self::fetchOne($sql, [$table], $dbName);
-        return $result !== null;
-    }
-
-    /**
-     * Interpolate query with parameters for debugging
-     */
-    private static function interpolateQuery(string $sql, array $params): string {
-        if (empty($params)) {
-            return $sql;
-        }
-
-        $keys = [];
-        $values = [];
-
-        foreach ($params as $param) {
-            $keys[] = '/\?/';
-            if (is_null($param)) {
-                $values[] = 'NULL';
-            } elseif (is_bool($param)) {
-                $values[] = $param ? '1' : '0';
-            } elseif (is_int($param) || is_float($param)) {
-                $values[] = (string) $param;
-            } else {
-                $values[] = "'" . addslashes($param) . "'";
-            }
-        }
-
-        $query = $sql;
-        foreach ($keys as $index => $key) {
-            $query = preg_replace($key, $values[$index], $query, 1);
-        }
-
-        return $query;
+        $_DB_CONN->set_charset($config['charset'] ?? 'utf8mb4');
     }
 }
 
-/**
- * Wrapper for database results to provide consistent API
- */
-class DatabaseResult {
-    private PDOStatement|mysqli_stmt $stmt;
-    private string $driver;
-    private ?array $fetchedRows = null;
-
-    public function __construct(PDOStatement|mysqli_stmt $stmt, string $driver) {
-        $this->stmt = $stmt;
-        $this->driver = $driver;
+function _db_get_types(array $params): string
+{
+    $types = '';
+    foreach ($params as $param) {
+        if (is_int($param))
+            $types .= 'i';
+        elseif (is_float($param))
+            $types .= 'd';
+        else
+            $types .= 's';
     }
+    return $types;
+}
 
-    /**
-     * Fetch all rows
-     */
-    public function fetchAll(): array {
-        if ($this->fetchedRows !== null) {
-            return $this->fetchedRows;
-        }
+function db_prepare(string $sql, array $params = []): object
+{
+    global $_DB_CONN, $_DB_DRIVER;
 
-        if ($this->driver === 'pdo') {
-            $this->fetchedRows = $this->stmt->fetchAll(PDO::FETCH_ASSOC);
-        } else {
-            $result = $this->stmt->get_result();
-            if (!$result) {
-                return [];
+    if ($_DB_CONN === null)
+        throw new Exception("Database connection not initialized");
+
+    if ($_DB_DRIVER === 'pdo') {
+        $stmt = $_DB_CONN->prepare($sql);
+        $stmt->execute($params);
+        return $stmt;
+    } else {
+        $stmt = $_DB_CONN->prepare($sql);
+        if (!empty($params)) {
+            $types = _db_get_types($params);
+            $refs = [];
+            foreach ($params as $key => $value) {
+                $refs[$key] = &$params[$key];
             }
-            $this->fetchedRows = $result->fetch_all(MYSQLI_ASSOC);
+            $stmt->bind_param($types, ...$refs);
         }
-
-        return $this->fetchedRows;
+        $stmt->execute();
+        return $stmt;
     }
+}
 
-    /**
-     * Fetch single row
-     */
-    public function fetch(): ?array {
-        if ($this->driver === 'pdo') {
-            $row = $this->stmt->fetch(PDO::FETCH_ASSOC);
-            return $row ?: null;
-        } else {
-            $result = $this->stmt->get_result();
-            if (!$result) {
-                return null;
-            }
-            $row = $result->fetch_assoc();
-            return $row ?: null;
-        }
+function db_fetch_all(string $sql, array $params = []): array
+{
+    $stmt = db_prepare($sql, $params);
+    global $_DB_DRIVER;
+
+    if ($_DB_DRIVER === 'pdo') {
+        return $stmt->fetchAll();
+    } else {
+        $result = $stmt->get_result();
+        return $result->fetch_all(MYSQLI_ASSOC);
     }
+}
 
-    /**
-     * Get affected rows
-     */
-    public function rowCount(): int {
-        if ($this->driver === 'pdo') {
-            return $this->stmt->rowCount();
+function db_fetch_one(string $sql, array $params = []): ?array
+{
+    $stmt = db_prepare($sql, $params);
+    global $_DB_DRIVER;
+
+    if ($_DB_DRIVER === 'pdo') {
+        $row = $stmt->fetch();
+        return $row ?: null;
+    } else {
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        return $row ?: null;
+    }
+}
+
+function db_execute(string $sql, array $params = []): bool
+{
+    db_prepare($sql, $params);
+    return true;
+}
+
+function db_close(): void
+{
+    global $_DB_CONN;
+    global $_DB_DRIVER;
+    if ($_DB_CONN !== null) {
+        if ($_DB_DRIVER === 'pdo') {
+            $_DB_CONN = null;
         } else {
-            return $this->stmt->affected_rows;
+            $_DB_CONN->close();
+            $_DB_CONN = null;
         }
     }
 }
