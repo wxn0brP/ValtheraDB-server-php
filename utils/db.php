@@ -26,11 +26,16 @@ function db_init(array $config): void
             $config['database'],
             $config['charset'] ?? 'utf8mb4'
         );
-        $_DB_CONN = new PDO($dsn, $config['username'], $config['password'], [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES => false,
-        ]);
+        $_DB_CONN = new PDO(
+            $dsn,
+            $config['username'],
+            $config['password'],
+            $config['options'] ?? [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+            ]
+        );
     } else {
         mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
         $_DB_CONN = new mysqli(
