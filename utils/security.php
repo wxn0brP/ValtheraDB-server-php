@@ -7,7 +7,8 @@
 /**
  * Set CORS headers for API responses
  */
-function setCorsHeaders(): void {
+function setCorsHeaders(): void
+{
     header("Access-Control-Allow-Origin: *");
     header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
     header("Access-Control-Allow-Headers: Content-Type, Authorization");
@@ -24,7 +25,8 @@ function setCorsHeaders(): void {
  * Check if script is being run directly (not included)
  * Exits with status code 1 if accessed directly
  */
-function protectFromDirectAccess(): void {
+function protectFromDirectAccess(): void
+{
     $includedFile = __FILE__;
     $includedFiles = get_included_files();
 
@@ -44,7 +46,8 @@ function protectFromDirectAccess(): void {
  * Check authentication credentials
  * Returns token name if authenticated, null otherwise
  */
-function checkAuth(?string $token = null): ?string {
+function checkAuth(?string $token = null): ?string
+{
     $configFile = __DIR__ . '/../config.php';
     if (!file_exists($configFile)) {
         return null;
@@ -67,8 +70,12 @@ function checkAuth(?string $token = null): ?string {
  * Exits with 401 if not authenticated
  * Returns token name if authenticated
  */
-function requireAuth(): string {
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+function requireAuth(): string
+{
+    $authHeader =
+        $_SERVER['HTTP_AUTHORIZATION']
+        ?? getallheaders()['Authorization']
+        ?? '';
     $token = null;
 
     if (preg_match('/Bearer\s+(.+)/i', $authHeader, $matches)) {
