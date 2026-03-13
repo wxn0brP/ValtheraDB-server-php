@@ -1,14 +1,15 @@
 <?php
 /**
  * Database configuration file
- * Supports multiple databases with a default configuration
- * 
- * Usage:
- * - "db_name" => [] - uses default config, overrides only specified keys
- * - "db_name" => "string" => [] - same as above, "string" is just a label
+ * Supports multiple databases with a shared default configuration.
+ *
+ * Behavior:
+ * - If a database entry is defined as [] or true, the default configuration is used.
+ * - In that case, the 'database' value is automatically set to the key name.
+ * - If a custom configuration array is provided, its values override the defaults.
  */
 
-// Hardcoded authentication credentials - multiple tokens with names/descriptions
+ // Hardcoded authentication tokens with descriptive names
 $auth = [
     'admin' => 'admin-token-123',
     'app' => 'app-token-456',
@@ -19,7 +20,9 @@ $auth = [
 $default = [
     'host' => 'localhost',
     'port' => 3306,
-    'database' => '.....',
+    // Intentionally empty. If a database entry does not define it
+    // and no automatic name can be assigned, an error will be thrown.
+    'database' => '',
     'username' => 'root',
     'password' => '',
     'charset' => 'utf8mb4',
@@ -31,11 +34,13 @@ $default = [
     ]
 ];
 
-// Named database configurations (override default settings)
 $databases = [
-    // Merge with default config
+    // Uses the default configuration.
+    // 'database' will automatically be set to 's'.
     's' => [],
 
+    // Custom configuration overriding selected default values.
+    // Values defined here take priority over the defaults.
     'sakila' => [
         'host' => 'localhost',
         'port' => 3306,

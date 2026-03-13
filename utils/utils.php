@@ -15,12 +15,17 @@ function getDbConfig(?string $dbName = null): array
     }
 
     $config = require $configFile;
+    $dbs = $config["databases"];
 
-    if ($dbName === null || !isset($config[$dbName])) {
+    if ($dbName === null || !isset($dbs[$dbName])) {
         return $config['default'];
     }
 
-    return array_merge($config['default'], $config[$dbName]);
+    return array_merge(
+        $config['default'],
+        ['database' => $dbName],
+        $dbs[$dbName] ? $dbs[$dbName] : []
+    );
 }
 
 /**
