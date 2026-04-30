@@ -65,6 +65,14 @@ function checkAuth(?string $token = null): ?string
     return null;
 }
 
+function set_unauthorized(): void
+{
+    http_response_code(401);
+    header('Content-Type: application/json');
+    echo json_encode(['err' => true, 'msg' => 'Unauthorized']);
+    exit(1);
+}
+
 /**
  * Require authentication from request
  * Exits with 401 if not authenticated
@@ -72,10 +80,28 @@ function checkAuth(?string $token = null): ?string
  */
 function requireAuth(): string
 {
+    $headers = function_exists('getallheaders') ? getallheaders() : [];
+
     $authHeader =
         $_SERVER['HTTP_AUTHORIZATION']
-        ?? getallheaders()['Authorization']
-        ?? '';
+        ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+        ?? $headers['Authorization']
+        ?? $headers['authorization']
+        ?? null;
+
+    if (empty($authHeader)) {
+        $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+        if (stripos($contentType, 'application/json') !== false) {
+            $rawInput = file_get_contents('php://input');
+            $jsonData = json_decode($rawInput, true);
+            if (is_array($jsonData))
+                $authHeader = $jsonData['auth'] ?? null;
+        }
+    }
+
+    if (empty($authHeader))
+        set_unauthorized();
+
     $token = null;
 
     if (preg_match('/Bearer\s+(.+)/i', $authHeader, $matches)) {
@@ -85,12 +111,8 @@ function requireAuth(): string
     }
 
     $tokenName = checkAuth($token);
-    if ($tokenName === null) {
-        http_response_code(401);
-        header('Content-Type: application/json');
-        echo json_encode(['err' => true, 'msg' => 'Unauthorized']);
-        exit(1);
-    }
+    if ($tokenName === null)
+        set_unauthorized();
 
     return $tokenName;
 }
