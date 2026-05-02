@@ -1,12 +1,4 @@
 <?php
-/**
- * Check if collection exists
- *
- * Usage:
- *   GET:  /issetCollection?collection=users
- *   POST: /issetCollection (JSON body: {"collection": "users"})
- */
-
 require_once __DIR__ . '/../utils/security.php';
 require_once __DIR__ . '/../utils/db.php';
 require_once __DIR__ . '/../utils/utils.php';
@@ -27,15 +19,14 @@ try {
     $collection = $params['collection'] ?? null;
     $dbName = $params['db'] ?? null;
 
-    if (!$collection) {
-        throw new Exception("Missing required parameter: collection");
+    if ($collection) {
+        $dbConfig = getDbConfig($dbName);
+        db_init($dbConfig);
+        jsonResponse(issetCollection($collection, $dbName));
+        db_close();
+    } else {
+        jsonErrResponse('Missing required parameter: collection', 400);
     }
-
-    $dbConfig = getDbConfig($dbName);
-    db_init($dbConfig);
-    jsonResponse(issetCollection($collection, $dbName));
-    db_close();
-
 } catch (Throwable $e) {
     error_log('[issetCollection.php] ERROR: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
     error_log('[issetCollection.php] Stack trace: ' . $e->getTraceAsString());

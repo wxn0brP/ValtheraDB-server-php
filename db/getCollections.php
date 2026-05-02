@@ -1,12 +1,4 @@
 <?php
-/**
- * Get list of all collections
- *
- * Usage:
- *   GET:  /getCollections
- *   POST: /getCollections
- */
-
 require_once __DIR__ . '/../utils/security.php';
 require_once __DIR__ . '/../utils/db.php';
 require_once __DIR__ . '/../utils/utils.php';

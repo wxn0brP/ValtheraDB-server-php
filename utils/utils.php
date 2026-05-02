@@ -185,6 +185,15 @@ function jsonResponse($data, int $statusCode = 200): void
     exit;
 }
 
+function jsonErrResponse($data, int $statusCode): void
+{
+    http_response_code($statusCode);
+    header('Content-Type: application/json');
+    echo json_encode(['err' => true, 'msg' => $data], JSON_PRETTY_PRINT);
+    exit;
+}
+
+
 /**
  * Send error response in standardized format
  * Format: { err: boolean, msg: string } - msg contains error message

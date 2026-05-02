@@ -274,3 +274,26 @@ function removeOne(array $params): ?array
     $results = remove($params, true);
     return !empty($results) ? $results[0] : null;
 }
+
+function assignDataPush($data): array
+{
+    if (!$data || !is_array($data) || empty($data)) {
+        return [];
+    }
+
+    $result = [];
+
+    foreach ($data as $key => $value) {
+        if (is_string($key) && strpos($key, '$') === 0) {
+            if (is_array($value) && !isset($value[0])) {
+                foreach ($value as $k => $v) {
+                    $result[$k] = $v;
+                }
+            }
+        } else {
+            $result[$key] = $value;
+        }
+    }
+
+    return $result;
+}
