@@ -1,20 +1,11 @@
 <?php
-/**
- * Database operations - core business logic
- * Provides functions for CRUD operations on collections
- */
-
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/utils.php';
 require_once __DIR__ . '/search.php';
+require_once __DIR__ . '/updater.php';
+require_once __DIR__ . '/id.php';
+require_once __DIR__ . '/findOpts.php';
 
-/**
- * Insert a new document into a collection
- *
- * @param array $params Operation parameters (collection, data, id_gen, db)
- * @return array Inserted document
- * @throws Exception If required parameters are missing
- */
 function add(array $params): array
 {
     $collection = $params['collection'] ?? null;
@@ -27,6 +18,9 @@ function add(array $params): array
 
     if (empty($data))
         throw new Exception("Missing required parameter: data");
+
+    if (!is_array($data))
+        $data = [$data];
 
     if ($idGen && !isset($data['_id']))
         $data['_id'] = genId();
@@ -52,24 +46,26 @@ function add(array $params): array
     return $data;
 }
 
-/**
- * Search for documents in a collection
- *
- * @param array $params Operation parameters (collection, search, limit, offset, sort, db)
- * @return array Array of matching documents
- * @throws Exception If required parameters are missing
- */
 function find(array $params): array
 {
     $collection = $params['collection'] ?? null;
     $search = $params['search'] ?? [];
-    $limit = $params['limit'] ?? null;
-    $offset = $params['offset'] ?? null;
-    $sort = $params['sort'] ?? null;
     $dbName = $params['db'] ?? null;
+    $dbFindOpts = $params['dbFindOpts'] ?? [];
+    $findOpts = $params['findOpts'] ?? [];
 
     if (!$collection)
         throw new Exception("Missing required parameter: collection");
+
+    $limit = $dbFindOpts['limit'] ?? null;
+    $offset = $dbFindOpts['offset'] ?? null;
+    $sortBy = $dbFindOpts['sortBy'] ?? null;
+    $sortAsc = $dbFindOpts['sortAsc'] ?? null;
+    $reverse = $dbFindOpts['reverse'] ?? false;
+
+    if ($reverse && $sortAsc !== null) {
+        $sortAsc = !$sortAsc;
+    }
 
     $dbConfig = getDbConfig($dbName);
     db_init($dbConfig);
@@ -84,17 +80,10 @@ function find(array $params): array
         $sql .= " WHERE " . $whereClause;
     }
 
-    if (is_array($sort)) {
-        $orderBy = [];
-        foreach ($sort as $field => $direction) {
-            $dir = strtoupper($direction) === 'DESC' ? 'DESC' : 'ASC';
-            $orderBy[] = escapeIdentifier($field, $_DB_DRIVER) . " {$dir}";
-        }
-        $sql .= " ORDER BY " . implode(', ', $orderBy);
+    if ($sortBy !== null) {
+        $dir = ($sortAsc === null || $sortAsc) ? 'ASC' : 'DESC';
+        $sql .= " ORDER BY " . escapeIdentifier($sortBy, $_DB_DRIVER) . " {$dir}";
     }
-
-    if ($limit === null && $params['dbFindOpts'])
-        $limit = $params['dbFindOpts']['limit'] ?? null;
 
     if ($limit !== null) {
         $sql .= " LIMIT " . intval($limit);
@@ -106,44 +95,26 @@ function find(array $params): array
     header('X-SQL-Query: ' . convertSqlAndParamsToString($sql, $whereParams));
 
     db_close();
+
+    if (!empty($findOpts)) {
+        $results = array_map(fn($row) => applyFindOpts($row, $findOpts), $results);
+    }
+
     return $results;
 }
 
-/**
- * Find a single document in a collection
- *
- * @param array $params Operation parameters (collection, search, db)
- * @return array|null Matching document or null if not found
- * @throws Exception If required parameters are missing
- */
-function findOne(array $params): ?array
-{
-    $params['limit'] = 1;
-    $results = find($params);
-    return !empty($results) ? $results[0] : null;
-}
-
-/**
- * Update documents in a collection
- *
- * @param array $params Operation parameters (collection, search, update, db)
- * @param bool $one If true, update only first matching document
- * @return array Array of updated documents
- * @throws Exception If required parameters are missing
- */
 function update(array $params, bool $one = false): array
 {
     $collection = $params['collection'] ?? null;
     $search = $params['search'] ?? [];
-    $updateData = $params['update'] ?? [];
+    $updater = $params['updater'] ?? [];
     $dbName = $params['db'] ?? null;
 
     if (!$collection)
         throw new Exception("Missing required parameter: collection");
 
-    if (empty($updateData))
-        throw new Exception("Missing required parameter: update");
-
+    if (empty($updater))
+        throw new Exception("Missing required parameter: updater");
 
     $dbConfig = getDbConfig($dbName);
     db_init($dbConfig);
@@ -167,11 +138,9 @@ function update(array $params, bool $one = false): array
     $results = [];
 
     foreach ($matchingDocs as $doc) {
-        $newData = array_merge($doc, $updateData);
+        $newData = applyUpdater($doc, $updater);
 
-        if (isset($updateData['_id']) && $updateData['_id'] !== $doc['_id']) {
-            $newData['_id'] = $doc['_id'];
-        }
+        $newData['_id'] = $doc['_id'];
 
         $keys = array_keys($newData);
         $keyIdIndex = array_search('_id', $keys);
@@ -179,16 +148,16 @@ function update(array $params, bool $one = false): array
             unset($keys[$keyIdIndex]);
         }
 
-        $setClause = implode(', ', array_map(fn($k) => "`{$k}` = ?", $keys));
+        $setClause = implode(', ', array_map(fn($k) => escapeIdentifier($k, $_DB_DRIVER) . " = ?", $keys));
         $updateValues = array_values(array_filter($newData, fn($k) => $k !== '_id', ARRAY_FILTER_USE_KEY));
 
-        $updateSql = "UPDATE " . escapeIdentifier($collection, $_DB_DRIVER) . " SET {$setClause} WHERE `_id` = ?";
+        $updateSql = "UPDATE " . escapeIdentifier($collection, $_DB_DRIVER) . " SET {$setClause} WHERE " . escapeIdentifier('_id', $_DB_DRIVER) . " = ?";
         $updateParams = [...$updateValues, $doc['_id']];
 
         db_execute($updateSql, $updateParams);
 
         $updatedDoc = db_fetch_one(
-            "SELECT * FROM " . escapeIdentifier($collection, $_DB_DRIVER) . " WHERE `_id` = ?",
+            "SELECT * FROM " . escapeIdentifier($collection, $_DB_DRIVER) . " WHERE " . escapeIdentifier('_id', $_DB_DRIVER) . " = ?",
             [$doc['_id']],
         );
 
@@ -200,27 +169,12 @@ function update(array $params, bool $one = false): array
     return $results;
 }
 
-/**
- * Update a single document in a collection
- *
- * @param array $params Operation parameters (collection, search, update, db)
- * @return array|null Updated document or null if no match found
- * @throws Exception If required parameters are missing
- */
 function updateOne(array $params): ?array
 {
     $results = update($params, true);
     return !empty($results) ? $results[0] : null;
 }
 
-/**
- * Remove documents from a collection
- *
- * @param array $params Operation parameters (collection, search, db)
- * @param bool $one If true, remove only first matching document
- * @return array Array of removed documents
- * @throws Exception If required parameters are missing
- */
 function remove(array $params, bool $one = false): array
 {
     $collection = $params['collection'] ?? null;
@@ -249,51 +203,22 @@ function remove(array $params, bool $one = false): array
     if (empty($matchingDocs))
         return [];
 
+    $deleteSql = '';
     $deletedDocs = [];
 
     foreach ($matchingDocs as $doc) {
-        $deleteSql = "DELETE FROM " . escapeIdentifier($collection, $_DB_DRIVER) . " WHERE `_id` = ?";
+        $deleteSql = "DELETE FROM " . escapeIdentifier($collection, $_DB_DRIVER) . " WHERE " . escapeIdentifier('_id', $_DB_DRIVER) . " = ?";
         db_execute($deleteSql, [$doc['_id']]);
         $deletedDocs[] = $doc;
     }
 
     db_close();
-    header('X-SQL-Query: ' . convertSqlAndParamsToString($deleteSql, [$doc['_id']]));
+    header('X-SQL-Query: ' . convertSqlAndParamsToString($deleteSql, [$doc['_id'] ?? null]));
     return $deletedDocs;
 }
 
-/**
- * Remove a single document from a collection
- *
- * @param array $params Operation parameters (collection, search, db)
- * @return array|null Removed document or null if no match found
- * @throws Exception If required parameters are missing
- */
 function removeOne(array $params): ?array
 {
     $results = remove($params, true);
     return !empty($results) ? $results[0] : null;
-}
-
-function assignDataPush($data): array
-{
-    if (!$data || !is_array($data) || empty($data)) {
-        return [];
-    }
-
-    $result = [];
-
-    foreach ($data as $key => $value) {
-        if (is_string($key) && strpos($key, '$') === 0) {
-            if (is_array($value) && !isset($value[0])) {
-                foreach ($value as $k => $v) {
-                    $result[$k] = $v;
-                }
-            }
-        } else {
-            $result[$key] = $value;
-        }
-    }
-
-    return $result;
 }

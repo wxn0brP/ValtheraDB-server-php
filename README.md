@@ -1,6 +1,6 @@
 # ValtheraDB Server PHP
 
-ValtheraDB adapter for MariaDB/MySQL. Provides ValtheraDB-compatible API for SQL databases.
+ValtheraDB adapter for MariaDB/MySQL. Probably provides a ValtheraDB-compatible API for SQL databases.
 
 ## Installation
 
@@ -37,7 +37,7 @@ For nginx/caddy/lighttpd, configure URL rewriting to strip `.php` from requests.
 
 ## Compatibility
 
-API is compatible with [ValtheraDB Server](https://github.com/wxn0brP/ValtheraDB-server).
+API is probably compatible with [ValtheraDB Server](https://github.com/wxn0brP/ValtheraDB-server).
 
 ## License
 

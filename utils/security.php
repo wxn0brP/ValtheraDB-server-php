@@ -1,12 +1,4 @@
 <?php
-/**
- * Security utilities - CORS and direct access protection
- * Include this file at the top of every db/ and utils/ script
- */
-
-/**
- * Set CORS headers for API responses
- */
 function setCorsHeaders(): void
 {
     header("Access-Control-Allow-Origin: *");
@@ -14,26 +6,17 @@ function setCorsHeaders(): void
     header("Access-Control-Allow-Headers: Content-Type, Authorization");
     header("Access-Control-Allow-Credentials: true");
 
-    // Handle preflight requests
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
         http_response_code(200);
         exit;
     }
 }
 
-/**
- * Check if script is being run directly (not included)
- * Exits with status code 1 if accessed directly
- */
 function protectFromDirectAccess(): void
 {
     $includedFile = __FILE__;
     $includedFiles = get_included_files();
-
-    // Remove the first file (the main entry point)
     $mainScript = array_shift($includedFiles);
-
-    // If this file is the main script, it was accessed directly
     if (realpath($includedFile) === realpath($mainScript)) {
         http_response_code(403);
         header('Content-Type: application/json');
@@ -42,10 +25,6 @@ function protectFromDirectAccess(): void
     }
 }
 
-/**
- * Check authentication credentials
- * Returns token name if authenticated, null otherwise
- */
 function checkAuth(?string $token = null): ?string
 {
     $configFile = __DIR__ . '/../config.php';
@@ -73,11 +52,6 @@ function set_unauthorized(): void
     exit(1);
 }
 
-/**
- * Require authentication from request
- * Exits with 401 if not authenticated
- * Returns token name if authenticated
- */
 function requireAuth(): string
 {
     $headers = function_exists('getallheaders') ? getallheaders() : [];
