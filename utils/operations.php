@@ -78,7 +78,7 @@ function find(array $params): array
     $sql = "SELECT * FROM " . escapeIdentifier($collection, $_DB_DRIVER);
 
     $whereParams = [];
-    $whereClause = buildWhere($search, $whereParams, $_DB_DRIVER);
+    $whereClause = buildWhere($search, $whereParams);
 
     if ($whereClause) {
         $sql .= " WHERE " . $whereClause;
@@ -151,7 +151,7 @@ function update(array $params, bool $one = false): array
 
     $selectSql = "SELECT * FROM " . escapeIdentifier($collection, $_DB_DRIVER);
     $whereParams = [];
-    $whereClause = buildWhere($search, $whereParams, $_DB_DRIVER);
+    $whereClause = buildWhere($search, $whereParams);
 
     if ($whereClause)
         $selectSql .= " WHERE " . $whereClause;
@@ -236,7 +236,7 @@ function remove(array $params, bool $one = false): array
 
     $selectSql = "SELECT * FROM " . escapeIdentifier($collection, $_DB_DRIVER);
     $whereParams = [];
-    $whereClause = buildWhere($search, $whereParams, $_DB_DRIVER);
+    $whereClause = buildWhere($search, $whereParams);
 
     if ($whereClause)
         $selectSql .= " WHERE " . $whereClause;

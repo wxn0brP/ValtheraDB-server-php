@@ -52,6 +52,35 @@ function genId(): string
     return "{$time}-{$part1}-{$part2}";
 }
 
+function convertIdToUnix(string $id): int
+{
+    return (int) base_convert(explode('-', $id)[0], 36, 10);
+}
+
+function compareIds(string|int $a, string|int $b): int
+{
+    if (is_string($a) && is_string($b)) {
+        $diff = convertIdToUnix($a) - convertIdToUnix($b);
+        return $diff !== 0 ? $diff : strcmp($a, $b);
+    }
+
+    if (is_numeric($a) && is_numeric($b)) {
+        return $a - $b;
+    }
+
+    $timeA = is_string($a) ? convertIdToUnix($a) : $a;
+    $timeB = is_string($b) ? convertIdToUnix($b) : $b;
+
+    return $timeA - $timeB;
+}
+
+function sortByIds(array $objects): array
+{
+    $copy = $objects;
+    usort($copy, fn($a, $b) => compareIds($a['_id'], $b['_id']));
+    return $copy;
+}
+
 /**
  * Bind parameters to mysqli statement
  * Helper for MySQLi driver
