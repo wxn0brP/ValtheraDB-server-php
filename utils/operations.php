@@ -62,29 +62,103 @@ function find(array $params): array
     $sortBy = $dbFindOpts['sortBy'] ?? null;
     $sortAsc = $dbFindOpts['sortAsc'] ?? null;
     $reverse = $dbFindOpts['reverse'] ?? false;
+    $groupBy = $dbFindOpts['groupBy'] ?? null;
+    $count = $dbFindOpts['count'] ?? null;
+    $min = $dbFindOpts['min'] ?? null;
+    $max = $dbFindOpts['max'] ?? null;
+    $avg = $dbFindOpts['avg'] ?? null;
 
-    if ($reverse && $sortAsc !== null) {
-        $sortAsc = !$sortAsc;
-    }
+    $hasAggregation = $groupBy !== null || $count !== null || $min !== null || $max !== null || $avg !== null;
+    $isRandomSort = $sortBy === 'random()';
+    $needsPhpReverse = $reverse && $sortBy === null && !$hasAggregation;
 
     $dbConfig = getDbConfig($dbName);
     db_init($dbConfig);
     global $_DB_DRIVER;
 
-    $sql = "SELECT * FROM " . escapeIdentifier($collection, $_DB_DRIVER);
+    // reverse without sortBy
+    if ($needsPhpReverse) {
+        $sql = "SELECT * FROM " . escapeIdentifier($collection, $_DB_DRIVER);
+        $whereParams = [];
+        $whereClause = buildWhere($search, $whereParams);
+        if ($whereClause)
+            $sql .= " WHERE " . $whereClause;
 
-    $whereParams = [];
-    $whereClause = buildWhere($search, $whereParams);
+        $results = db_fetch_all($sql, $whereParams);
+        header('X-SQL-Query: ' . convertSqlAndParamsToString($sql, $whereParams));
+        db_close();
 
-    if ($whereClause) {
-        $sql .= " WHERE " . $whereClause;
+        $results = array_reverse($results);
+
+        $effectiveOffset = $offset !== null ? (int) $offset : 0;
+        if ($limit !== null && $limit !== -1)
+            $results = array_slice($results, $effectiveOffset, (int) $limit);
+        elseif ($effectiveOffset > 0)
+            $results = array_slice($results, $effectiveOffset);
+
+        if (!empty($findOpts))
+            $results = array_map(fn($row) => applyFindOpts($row, $findOpts), $results);
+
+        return $results;
     }
 
-    if ($sortBy !== null) {
-        $dir = ($sortAsc === null || $sortAsc) ? 'ASC' : 'DESC';
+    // Build SELECT clause
+    if ($hasAggregation) {
+        $selectParts = [];
+
+        if ($groupBy !== null) {
+            $groupByFields = is_array($groupBy) ? $groupBy : [$groupBy];
+            foreach ($groupByFields as $f) {
+                $selectParts[] = escapeIdentifier($f, $_DB_DRIVER);
+            }
+        }
+
+        if ($count)
+            foreach ($count as $outKey => $srcField)
+                $selectParts[] = "COUNT(" . escapeIdentifier($srcField, $_DB_DRIVER) . ") AS " . escapeIdentifier($outKey, $_DB_DRIVER);
+
+        if ($min)
+            foreach ($min as $outKey => $srcField)
+                $selectParts[] = "MIN(" . escapeIdentifier($srcField, $_DB_DRIVER) . ") AS " . escapeIdentifier($outKey, $_DB_DRIVER);
+
+        if ($max)
+            foreach ($max as $outKey => $srcField)
+                $selectParts[] = "MAX(" . escapeIdentifier($srcField, $_DB_DRIVER) . ") AS " . escapeIdentifier($outKey, $_DB_DRIVER);
+
+        if ($avg)
+            foreach ($avg as $outKey => $srcField)
+                $selectParts[] = "AVG(" . escapeIdentifier($srcField, $_DB_DRIVER) . ") AS " . escapeIdentifier($outKey, $_DB_DRIVER);
+
+        $sql = "SELECT " . implode(', ', $selectParts) . " FROM " . escapeIdentifier($collection, $_DB_DRIVER);
+    } else {
+        $sql = "SELECT * FROM " . escapeIdentifier($collection, $_DB_DRIVER);
+    }
+
+    // WHERE clause
+    $whereParams = [];
+    $whereClause = buildWhere($search, $whereParams);
+    if ($whereClause)
+        $sql .= " WHERE " . $whereClause;
+
+    // GROUP BY (aggregation)
+    if ($hasAggregation && $groupBy !== null) {
+        $groupByFields = is_array($groupBy) ? $groupBy : [$groupBy];
+        $gbParts = array_map(fn($f) => escapeIdentifier($f, $_DB_DRIVER), $groupByFields);
+        $sql .= " GROUP BY " . implode(', ', $gbParts);
+    }
+
+    // ORDER BY
+    if ($isRandomSort) {
+        $sql .= " ORDER BY RAND()";
+    } elseif ($sortBy !== null) {
+        $effectiveSortAsc = $sortAsc ?? true;
+        if ($reverse)
+            $effectiveSortAsc = !$effectiveSortAsc;
+        $dir = $effectiveSortAsc ? 'ASC' : 'DESC';
         $sql .= " ORDER BY " . escapeIdentifier($sortBy, $_DB_DRIVER) . " {$dir}";
     }
 
+    // LIMIT / OFFSET
     if ($limit !== null) {
         $sql .= " LIMIT " . intval($limit);
         if ($offset !== null)
@@ -93,12 +167,14 @@ function find(array $params): array
 
     $results = db_fetch_all($sql, $whereParams);
     header('X-SQL-Query: ' . convertSqlAndParamsToString($sql, $whereParams));
-
     db_close();
 
-    if (!empty($findOpts)) {
+    // Aggregation without groupBy: unwrap single-object array
+    if ($hasAggregation && $groupBy === null)
+        return !empty($results) ? $results[0] : [];
+
+    if (!empty($findOpts) && !$hasAggregation)
         $results = array_map(fn($row) => applyFindOpts($row, $findOpts), $results);
-    }
 
     return $results;
 }
