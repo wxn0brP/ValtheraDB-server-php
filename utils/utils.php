@@ -44,15 +44,22 @@ function getRequestParams(): array
         $rawInput = file_get_contents('php://input');
         $jsonData = json_decode($rawInput, true);
         if (is_array($jsonData)) {
-            if (isset($jsonData['db']))
-                $dbName = $jsonData['db'];
-
-            if (isset($jsonData['params']) && is_array($jsonData['params']) && isset($jsonData['params'][0]))
-                $params = array_merge($params, $jsonData['params'][0]);
-            elseif (isset($jsonData['params']) && is_array($jsonData['params']))
-                $params = array_merge($params, $jsonData['params']);
+            if (array_key_exists('query', $jsonData)) {
+                $dbName = $jsonData['auth'] ?? null;
+                if (is_array($jsonData['query']))
+                    $params = array_merge($params, $jsonData['query']);
+                elseif (is_string($jsonData['query']))
+                    $params['collection'] = $jsonData['query'];
+            } else {
+                if (isset($jsonData['db']))
+                    $dbName = $jsonData['db'];
+                if (isset($jsonData['params']) && is_array($jsonData['params']) && isset($jsonData['params'][0]))
+                    $params = array_merge($params, $jsonData['params'][0]);
+                elseif (isset($jsonData['params']) && is_array($jsonData['params']))
+                    $params = array_merge($params, $jsonData['params']);
+            }
             foreach ($jsonData as $key => $value) {
-                if ($key !== 'db' && $key !== 'params' && $key !== 'keys') {
+                if (!in_array($key, ['db', 'params', 'keys', 'query'])) {
                     $params[$key] = $value;
                 }
             }

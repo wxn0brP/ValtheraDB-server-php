@@ -8,9 +8,9 @@ require_once __DIR__ . '/../utils/utils.php';
  */
 function issetCollection(string $collection, string $dbName): bool
 {
-    $sql = 'SHOW TABLES LIKE ?';
-    $result = db_fetch_all($sql, [$dbName]);
-    return count($result) > 0;
+    $sql = "SELECT COUNT(*) AS cnt FROM information_schema.TABLES WHERE TABLE_NAME = ? AND TABLE_SCHEMA = ?";
+    $result = db_fetch_all($sql, [$collection, $dbName]);
+    return !empty($result) && $result[0]['cnt'] > 0;
 }
 
 // Handle direct API call

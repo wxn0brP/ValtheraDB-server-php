@@ -3,9 +3,9 @@ require_once __DIR__ . '/../utils/security.php';
 require_once __DIR__ . '/../utils/db.php';
 require_once __DIR__ . '/../utils/utils.php';
 
-function ensureCollection(string $collection): bool
+function removeCollection(string $collection): bool
 {
-    $sql = 'CREATE TABLE IF NOT EXISTS ' . escapeIdentifier($collection, 'mysql') . ' (_id VARCHAR(64) PRIMARY KEY)';
+    $sql = 'DROP TABLE IF EXISTS ' . escapeIdentifier($collection, 'mysql');
     return db_execute($sql, []);
 }
 
@@ -17,15 +17,15 @@ try {
     if ($collection) {
         $dbConfig = getDbConfig($dbName);
         db_init($dbConfig);
-        global $_DB_DRIVER;
 
-        $result = ensureCollection($collection);
+        $result = removeCollection($collection);
         jsonResponse($result);
+        db_close();
     } else {
         jsonErrResponse('Missing required parameter: collection', 400);
     }
 } catch (Throwable $e) {
-    error_log('[ensureCollection.php] ERROR: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
-    error_log('[ensureCollection.php] Stack trace: ' . $e->getTraceAsString());
+    error_log('[removeCollection.php] ERROR: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    error_log('[removeCollection.php] Stack trace: ' . $e->getTraceAsString());
     errorResponse($e->getMessage());
 }

@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/updater.php';
+
 function applyFindOpts(array $doc, array $findOpts): array
 {
     $result = $doc;

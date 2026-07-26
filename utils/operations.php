@@ -6,6 +6,24 @@ require_once __DIR__ . '/updater.php';
 require_once __DIR__ . '/id.php';
 require_once __DIR__ . '/findOpts.php';
 
+function ensureColumns(string $collection, array $data): void
+{
+    global $_DB_DRIVER;
+
+    $sql = 'SHOW COLUMNS FROM ' . escapeIdentifier($collection, $_DB_DRIVER);
+    $columns = db_fetch_all($sql, []);
+    $existingColumns = array_column($columns, 'Field');
+
+    foreach (array_keys($data) as $key) {
+        if ($key === '_id') continue;
+        if (!in_array($key, $existingColumns)) {
+            $alterSql = 'ALTER TABLE ' . escapeIdentifier($collection, $_DB_DRIVER)
+                . ' ADD COLUMN ' . escapeIdentifier($key, $_DB_DRIVER) . ' TEXT';
+            db_execute($alterSql, []);
+        }
+    }
+}
+
 function add(array $params): array
 {
     $collection = $params['collection'] ?? null;
@@ -28,6 +46,8 @@ function add(array $params): array
     $dbConfig = getDbConfig($dbName);
     db_init($dbConfig);
     global $_DB_DRIVER;
+
+    ensureColumns($collection, $data);
 
     $keys = array_keys($data);
     $columns = implode(
@@ -217,6 +237,8 @@ function update(array $params, bool $one = false): array
         $newData = applyUpdater($doc, $updater);
 
         $newData['_id'] = $doc['_id'];
+
+        ensureColumns($collection, $newData);
 
         $keys = array_keys($newData);
         $keyIdIndex = array_search('_id', $keys);

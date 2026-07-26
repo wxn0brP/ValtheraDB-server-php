@@ -10,6 +10,7 @@ function getCollections(?string $dbName = null): array
 {
     $sql = "SHOW TABLES";
     $tables = db_fetch_all($sql, []);
+    if (empty($tables)) return [];
     return array_column($tables, array_keys($tables[0])[0]);
 }
 

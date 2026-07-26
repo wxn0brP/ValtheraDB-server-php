@@ -91,13 +91,14 @@ function applyUpdater(array $doc, array $updater): array
                     unset($target[$key]);
                 }
             },
+            'deepmerge' => function (array &$target, $key, $value): void {
+                if (is_array($value)) {
+                    $target[$key] = isset($target[$key]) && is_array($target[$key])
+                        ? array_merge_recursive($target[$key], $value)
+                        : $value;
+                }
+            },
         ]);
-
-        if (array_key_exists('$deepmerge', $ops) && is_array($ops['$deepmerge'])) {
-            $result = empty($result)
-                ? $ops['$deepmerge']
-                : array_merge_recursive($result, $ops['$deepmerge']);
-        }
     }
 
     foreach ($direct as $key => $value) {

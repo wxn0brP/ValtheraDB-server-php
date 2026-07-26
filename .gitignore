@@ -1,2 +1,5 @@
 config.php
 .vscode
+bun.lock
+.env
+node_modules

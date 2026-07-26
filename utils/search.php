@@ -129,7 +129,8 @@ function buildCondition(string $col, $value, array &$params, array &$parts, stri
                 $parts[] = $value ? "$col IS NOT NULL" : "$col IS NULL";
                 break;
             case '$size':
-                $parts[] = "CHAR_LENGTH($col) = ?";
+                $parts[] = "(CHAR_LENGTH($col) = ? OR JSON_LENGTH($col) = ?)";
+                $params[] = (int)$value;
                 $params[] = (int)$value;
                 break;
             case '$arrinc':
@@ -141,6 +142,32 @@ function buildCondition(string $col, $value, array &$params, array &$parts, stri
             case '$idgte': $parts[] = "$col >= ?"; $params[] = $value; break;
             case '$idlte': $parts[] = "$col <= ?"; $params[] = $value; break;
             case '$type':
+                $typeVal = strtolower((string)$value);
+                switch ($typeVal) {
+                    case 'null':
+                        $parts[] = "$col IS NULL";
+                        break;
+                    case 'boolean':
+                    case 'bool':
+                        $parts[] = "($col = 0 OR $col = 1 OR $col = '0' OR $col = '1')";
+                        break;
+                    case 'number':
+                    case 'integer':
+                    case 'int':
+                    case 'float':
+                    case 'double':
+                        $parts[] = "$col REGEXP '^-?[0-9]+(\\.[0-9]+)?$'";
+                        break;
+                    case 'array':
+                        $parts[] = "JSON_TYPE($col) = 'ARRAY'";
+                        break;
+                    case 'object':
+                        $parts[] = "JSON_TYPE($col) = 'OBJECT'";
+                        break;
+                    case 'string':
+                        $parts[] = "$col IS NOT NULL AND $col NOT REGEXP '^-?[0-9]+(\\.[0-9]+)?$' AND $col NOT IN (0, 1) AND JSON_TYPE($col) IS NULL";
+                        break;
+                }
                 break;
             default:
                 buildComparison($col, $value, $params, $parts, '=');

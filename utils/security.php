@@ -1,4 +1,6 @@
 <?php
+ini_set('display_errors', '0');
+
 function setCorsHeaders(): void
 {
     header("Access-Control-Allow-Origin: *");
@@ -68,8 +70,12 @@ function requireAuth(): string
         if (stripos($contentType, 'application/json') !== false) {
             $rawInput = file_get_contents('php://input');
             $jsonData = json_decode($rawInput, true);
-            if (is_array($jsonData))
-                $authHeader = $jsonData['auth'] ?? null;
+            if (is_array($jsonData)) {
+                if (array_key_exists('query', $jsonData))
+                    $authHeader = $jsonData['db'] ?? $jsonData['auth'] ?? null;
+                else
+                    $authHeader = $jsonData['auth'] ?? null;
+            }
         }
     }
 
