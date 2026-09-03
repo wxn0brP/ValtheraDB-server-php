@@ -121,6 +121,14 @@ function buildCondition(string $col, $value, array &$params, array &$parts, stri
                 $parts[] = "$col LIKE ?";
                 $params[] = '%' . $value;
                 break;
+            case '$istartswith':
+                $parts[] = "LOWER($col) LIKE ?";
+                $params[] = strtolower($value) . '%';
+                break;
+            case '$iendswith':
+                $parts[] = "LOWER($col) LIKE ?";
+                $params[] = '%' . strtolower($value);
+                break;
             case '$regex':
                 $parts[] = "$col REGEXP ?";
                 $params[] = $value;

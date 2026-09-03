@@ -8,6 +8,7 @@ function applyUpdater(array $doc, array $updater): array
     $result = $doc;
     $ops = [];
     $direct = [];
+    $removedKeys = [];
 
     foreach ($updater as $key => $value) {
         if (is_string($key) && str_starts_with($key, '$')) {
@@ -34,8 +35,16 @@ function applyUpdater(array $doc, array $updater): array
             },
             'pushset' => function (array &$target, $key, $value): void {
                 $target[$key] ??= [];
-                if (!in_array($value, $target[$key], true)) {
-                    $target[$key][] = $value;
+                if (is_array($value) && array_is_list($value)) {
+                    foreach ($value as $v) {
+                        if (!in_array($v, $target[$key], true)) {
+                            $target[$key][] = $v;
+                        }
+                    }
+                } else {
+                    if (!in_array($value, $target[$key], true)) {
+                        $target[$key][] = $value;
+                    }
                 }
             },
             'pull' => function (array &$target, $key, $value): void {
@@ -51,10 +60,18 @@ function applyUpdater(array $doc, array $updater): array
                 }
             },
             'merge' => function (array &$target, $key, $value): void {
-                if (is_array($value)) {
-                    $target[$key] = isset($target[$key]) && is_array($target[$key])
-                        ? array_merge($target[$key], $value)
-                        : $value;
+                if (is_array($value) && array_is_list($value)) {
+                    if (isset($target[$key]) && is_array($target[$key]) && array_is_list($target[$key])) {
+                        $target[$key] = [...$target[$key], ...$value];
+                    } else {
+                        $target[$key] = $value;
+                    }
+                } else {
+                    if (isset($target[$key]) && is_array($target[$key]) && is_array($value)) {
+                        $target[$key] = array_merge($target[$key], $value);
+                    } else {
+                        $target[$key] = $value;
+                    }
                 }
             },
             'inc' => function (array &$target, $key, $value): void {
@@ -77,25 +94,29 @@ function applyUpdater(array $doc, array $updater): array
                     $target[$key] = -(is_numeric($value) ? $value : 0);
                 }
             },
-            'rename' => function (array &$target, $key, $value): void {
+            'rename' => function (array &$target, $key, $value) use (&$removedKeys): void {
                 if (is_string($value) && array_key_exists($key, $target)) {
                     $target[$value] = $target[$key];
                     unset($target[$key]);
+                    $removedKeys[$key] = true;
                 }
             },
             'set' => function (array &$target, $key, $value): void {
                 $target[$key] = $value;
             },
-            'unset' => function (array &$target, $key, $_): void {
+            'unset' => function (array &$target, $key, $_) use (&$removedKeys): void {
                 if (array_key_exists($key, $target)) {
                     unset($target[$key]);
+                    $removedKeys[$key] = true;
                 }
             },
             'deepmerge' => function (array &$target, $key, $value): void {
                 if (is_array($value)) {
                     $target[$key] = isset($target[$key]) && is_array($target[$key])
-                        ? array_merge_recursive($target[$key], $value)
+                        ? deepMergeRecursive($target[$key], $value)
                         : $value;
+                } else {
+                    $target[$key] = $value;
                 }
             },
         ]);
@@ -105,7 +126,7 @@ function applyUpdater(array $doc, array $updater): array
         $result[$key] = $value;
     }
 
-    return $result;
+    return [$result, $removedKeys];
 }
 
 function applyUpdaterOps(array &$obj, array $ops, array $handlers): void
@@ -144,4 +165,16 @@ function deepUpdateCheck(array $valueObj, array &$targetObj, callable $handler):
             $handler($targetObj, $k, $v);
         }
     }
+}
+
+function deepMergeRecursive(array $target, array $source): array
+{
+    foreach ($source as $key => $value) {
+        if (is_array($value) && !array_is_list($value) && isset($target[$key]) && is_array($target[$key]) && !array_is_list($target[$key])) {
+            $target[$key] = deepMergeRecursive($target[$key], $value);
+        } else {
+            $target[$key] = $value;
+        }
+    }
+    return $target;
 }

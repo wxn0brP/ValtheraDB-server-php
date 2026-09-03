@@ -72,7 +72,7 @@ function requireAuth(): string
             $jsonData = json_decode($rawInput, true);
             if (is_array($jsonData)) {
                 if (array_key_exists('query', $jsonData))
-                    $authHeader = $jsonData['db'] ?? $jsonData['auth'] ?? null;
+                    $authHeader = $jsonData['auth'] ?? $jsonData['db'] ?? null;
                 else
                     $authHeader = $jsonData['auth'] ?? null;
             }

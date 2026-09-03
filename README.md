@@ -3,7 +3,7 @@
 ValtheraDB adapter for MariaDB/MySQL. Probably provides a ValtheraDB-compatible API for SQL databases.
 
 Compatible with core
-0.11.5
+0.12.2
 
 ## Installation
 

@@ -45,7 +45,7 @@ function getRequestParams(): array
         $jsonData = json_decode($rawInput, true);
         if (is_array($jsonData)) {
             if (array_key_exists('query', $jsonData)) {
-                $dbName = $jsonData['auth'] ?? null;
+                $dbName = $jsonData['db'] ?? null;
                 if (is_array($jsonData['query']))
                     $params = array_merge($params, $jsonData['query']);
                 elseif (is_string($jsonData['query']))
