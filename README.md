@@ -27,7 +27,7 @@ $default = [
     'username' => 'username',
     'password' => 'password',
     'charset' => 'utf8mb4',
-    'driver' => 'auto',
+
 ];
 ```
 

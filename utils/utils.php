@@ -20,11 +20,8 @@ function getDbConfig(?string $dbName = null): array
     );
 }
 
-function escapeIdentifier(string $name, string $type): string
+function escapeIdentifier(string $name): string
 {
-    if ($type === "postgres") {
-        return '"' . str_replace('"', '""', $name) . '"';
-    }
     return "`" . str_replace("`", "``", $name) . "`";
 }
 

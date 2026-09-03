@@ -36,7 +36,7 @@ function buildWhere(array $query, array &$params): string {
 
     foreach ($query as $key => $value) {
         if (!str_starts_with($key, '$')) {
-            $col = escapeMariaDbIdentifier($key);
+            $col = escapeIdentifier($key);
             buildCondition($col, $value, $params, $parts, '$eq');
         }
     }
@@ -50,7 +50,7 @@ function buildWhere(array $query, array &$params): string {
         if ($key === '$not' || $key === '$subset') continue;
         if (!is_array($value)) continue;
         foreach ($value as $field => $val) {
-            $col = escapeMariaDbIdentifier($field);
+            $col = escapeIdentifier($field);
             buildCondition($col, $val, $params, $parts, $key);
         }
     }
@@ -63,7 +63,7 @@ function buildWhere(array $query, array &$params): string {
     if ($subsetQuery !== null) {
         if (is_array($subsetQuery)) {
             foreach ($subsetQuery as $literalKey => $val) {
-                $col = escapeMariaDbIdentifier($literalKey);
+                $col = escapeIdentifier($literalKey);
                 buildCondition($col, $val, $params, $parts, '$eq');
             }
         }
@@ -203,6 +203,4 @@ function buildComparison(string $col, $value, array &$params, array &$parts, str
     }
 }
 
-function escapeMariaDbIdentifier(string $identifier): string {
-    return '`' . str_replace('`', '``', $identifier) . '`';
-}
+

@@ -8,9 +8,7 @@ require_once __DIR__ . '/findOpts.php';
 
 function createTableIfNotExists(string $collection): void
 {
-    global $_DB_DRIVER;
-    $driver = $_DB_DRIVER ?? 'mysql';
-    $sql = 'CREATE TABLE IF NOT EXISTS ' . escapeIdentifier($collection, $driver) . ' (_id VARCHAR(64) PRIMARY KEY)';
+    $sql = 'CREATE TABLE IF NOT EXISTS ' . escapeIdentifier($collection) . ' (_id VARCHAR(64) PRIMARY KEY)';
     db_execute($sql, []);
 }
 
@@ -60,17 +58,15 @@ function encodeDocFields(array $doc): array
 
 function ensureColumns(string $collection, array $data): void
 {
-    global $_DB_DRIVER;
-
-    $sql = 'SHOW COLUMNS FROM ' . escapeIdentifier($collection, $_DB_DRIVER ?? 'mysql');
+    $sql = 'SHOW COLUMNS FROM ' . escapeIdentifier($collection);
     $columns = db_fetch_all($sql, []);
     $existingColumns = array_column($columns, 'Field');
 
     foreach (array_keys($data) as $key) {
         if ($key === '_id') continue;
         if (!in_array($key, $existingColumns)) {
-            $alterSql = 'ALTER TABLE ' . escapeIdentifier($collection, $_DB_DRIVER ?? 'mysql')
-                . ' ADD COLUMN ' . escapeIdentifier($key, $_DB_DRIVER ?? 'mysql') . ' TEXT';
+            $alterSql = 'ALTER TABLE ' . escapeIdentifier($collection)
+                . ' ADD COLUMN ' . escapeIdentifier($key) . ' TEXT';
             db_execute($alterSql, []);
         }
     }
@@ -98,7 +94,6 @@ function add(array $params): array
 
     $dbConfig = getDbConfig($dbName);
     db_init($dbConfig);
-    global $_DB_DRIVER;
 
     createTableIfNotExists($collection);
     ensureColumns($collection, $data);
@@ -108,11 +103,11 @@ function add(array $params): array
     $columns = implode(
         ', ',
         array_map(fn($k) =>
-            escapeIdentifier($k, $_DB_DRIVER ?? 'mysql'), $keys)
+            escapeIdentifier($k), $keys)
     );
     $placeholders = implode(', ', array_fill(0, count($keys), '?'));
 
-    $sql = "INSERT INTO " . escapeIdentifier($collection, $_DB_DRIVER ?? 'mysql') . " ({$columns}) VALUES ({$placeholders})";
+    $sql = "INSERT INTO " . escapeIdentifier($collection) . " ({$columns}) VALUES ({$placeholders})";
 
     db_execute($sql, array_values($encodedData));
     header('X-SQL-Query: ' . convertSqlAndParamsToString($sql, array_values($encodedData)));
@@ -159,10 +154,9 @@ function find(array $params): array
 
     $dbConfig = getDbConfig($dbName);
     db_init($dbConfig);
-    global $_DB_DRIVER;
 
     if ($needsPhpReverse) {
-        $sql = "SELECT * FROM " . escapeIdentifier($collection, $_DB_DRIVER ?? 'mysql');
+        $sql = "SELECT * FROM " . escapeIdentifier($collection);
         $whereParams = [];
         $whereClause = buildWhere($search, $whereParams);
         if ($whereClause)
@@ -193,33 +187,33 @@ function find(array $params): array
         if ($groupBy !== null) {
             $groupByFields = is_array($groupBy) ? $groupBy : [$groupBy];
             foreach ($groupByFields as $f) {
-                $selectParts[] = escapeIdentifier($f, $_DB_DRIVER ?? 'mysql');
+                $selectParts[] = escapeIdentifier($f);
             }
         }
 
         if ($count)
             foreach ($count as $outKey => $srcField)
-                $selectParts[] = "COUNT(" . escapeIdentifier($srcField, $_DB_DRIVER ?? 'mysql') . ") AS " . escapeIdentifier($outKey, $_DB_DRIVER ?? 'mysql');
+                $selectParts[] = "COUNT(" . escapeIdentifier($srcField) . ") AS " . escapeIdentifier($outKey);
 
         if ($min)
             foreach ($min as $outKey => $srcField)
-                $selectParts[] = "MIN(" . escapeIdentifier($srcField, $_DB_DRIVER ?? 'mysql') . ") AS " . escapeIdentifier($outKey, $_DB_DRIVER ?? 'mysql');
+                $selectParts[] = "MIN(" . escapeIdentifier($srcField) . ") AS " . escapeIdentifier($outKey);
 
         if ($max)
             foreach ($max as $outKey => $srcField)
-                $selectParts[] = "MAX(" . escapeIdentifier($srcField, $_DB_DRIVER ?? 'mysql') . ") AS " . escapeIdentifier($outKey, $_DB_DRIVER ?? 'mysql');
+                $selectParts[] = "MAX(" . escapeIdentifier($srcField) . ") AS " . escapeIdentifier($outKey);
 
         if ($avg)
             foreach ($avg as $outKey => $srcField)
-                $selectParts[] = "AVG(" . escapeIdentifier($srcField, $_DB_DRIVER ?? 'mysql') . ") AS " . escapeIdentifier($outKey, $_DB_DRIVER ?? 'mysql');
+                $selectParts[] = "AVG(" . escapeIdentifier($srcField) . ") AS " . escapeIdentifier($outKey);
 
         if ($sum)
             foreach ($sum as $outKey => $srcField)
-                $selectParts[] = "SUM(" . escapeIdentifier($srcField, $_DB_DRIVER ?? 'mysql') . ") AS " . escapeIdentifier($outKey, $_DB_DRIVER ?? 'mysql');
+                $selectParts[] = "SUM(" . escapeIdentifier($srcField) . ") AS " . escapeIdentifier($outKey);
 
-        $sql = "SELECT " . implode(', ', $selectParts) . " FROM " . escapeIdentifier($collection, $_DB_DRIVER ?? 'mysql');
+        $sql = "SELECT " . implode(', ', $selectParts) . " FROM " . escapeIdentifier($collection);
     } else {
-        $sql = "SELECT * FROM " . escapeIdentifier($collection, $_DB_DRIVER ?? 'mysql');
+        $sql = "SELECT * FROM " . escapeIdentifier($collection);
     }
 
     $whereParams = [];
@@ -229,7 +223,7 @@ function find(array $params): array
 
     if ($hasAggregation && $groupBy !== null) {
         $groupByFields = is_array($groupBy) ? $groupBy : [$groupBy];
-        $gbParts = array_map(fn($f) => escapeIdentifier($f, $_DB_DRIVER ?? 'mysql'), $groupByFields);
+        $gbParts = array_map(fn($f) => escapeIdentifier($f), $groupByFields);
         $sql .= " GROUP BY " . implode(', ', $gbParts);
     }
 
@@ -242,7 +236,7 @@ function find(array $params): array
             $asc = is_array($sortItem) ? ($sortItem['asc'] ?? true) : ($sortAsc ?? true);
             if ($reverse) $asc = !$asc;
             $dir = $asc ? 'ASC' : 'DESC';
-            $orderParts[] = escapeIdentifier($field, $_DB_DRIVER ?? 'mysql') . " {$dir}";
+            $orderParts[] = escapeIdentifier($field) . " {$dir}";
         }
         $sql .= " ORDER BY " . implode(', ', $orderParts);
     } elseif ($sortBy !== null) {
@@ -250,7 +244,7 @@ function find(array $params): array
         if ($reverse)
             $effectiveSortAsc = !$effectiveSortAsc;
         $dir = $effectiveSortAsc ? 'ASC' : 'DESC';
-        $sql .= " ORDER BY " . escapeIdentifier($sortBy, $_DB_DRIVER ?? 'mysql') . " {$dir}";
+        $sql .= " ORDER BY " . escapeIdentifier($sortBy) . " {$dir}";
     }
 
     if ($limit !== null && $limit !== -1) {
@@ -305,9 +299,8 @@ function update(array $params, bool $one = false): array
 
     $dbConfig = getDbConfig($dbName);
     db_init($dbConfig);
-    global $_DB_DRIVER;
 
-    $selectSql = "SELECT * FROM " . escapeIdentifier($collection, $_DB_DRIVER ?? 'mysql');
+    $selectSql = "SELECT * FROM " . escapeIdentifier($collection);
     $whereParams = [];
     $whereClause = buildWhere($search, $whereParams);
 
@@ -348,7 +341,7 @@ function update(array $params, bool $one = false): array
 
         if (empty($keys)) {
             $updatedDoc = db_fetch_one(
-                "SELECT * FROM " . escapeIdentifier($collection, $_DB_DRIVER ?? 'mysql') . " WHERE " . escapeIdentifier('_id', $_DB_DRIVER ?? 'mysql') . " = ?",
+                "SELECT * FROM " . escapeIdentifier($collection) . " WHERE " . escapeIdentifier('_id') . " = ?",
                 [$doc['_id']],
             );
             $updatedDoc = decodeDocFields($updatedDoc);
@@ -359,16 +352,16 @@ function update(array $params, bool $one = false): array
             continue;
         }
 
-        $setClause = implode(', ', array_map(fn($k) => escapeIdentifier($k, $_DB_DRIVER ?? 'mysql') . " = ?", $keys));
+        $setClause = implode(', ', array_map(fn($k) => escapeIdentifier($k) . " = ?", $keys));
         $updateValues = array_values(array_filter($encodedData, fn($k) => $k !== '_id', ARRAY_FILTER_USE_KEY));
 
-        $updateSql = "UPDATE " . escapeIdentifier($collection, $_DB_DRIVER ?? 'mysql') . " SET {$setClause} WHERE " . escapeIdentifier('_id', $_DB_DRIVER ?? 'mysql') . " = ?";
+        $updateSql = "UPDATE " . escapeIdentifier($collection) . " SET {$setClause} WHERE " . escapeIdentifier('_id') . " = ?";
         $updateParams = [...$updateValues, $doc['_id']];
 
         db_execute($updateSql, $updateParams);
 
         $updatedDoc = db_fetch_one(
-            "SELECT * FROM " . escapeIdentifier($collection, $_DB_DRIVER ?? 'mysql') . " WHERE " . escapeIdentifier('_id', $_DB_DRIVER ?? 'mysql') . " = ?",
+            "SELECT * FROM " . escapeIdentifier($collection) . " WHERE " . escapeIdentifier('_id') . " = ?",
             [$doc['_id']],
         );
 
@@ -403,9 +396,8 @@ function remove(array $params, bool $one = false): array
 
     $dbConfig = getDbConfig($dbName);
     db_init($dbConfig);
-    global $_DB_DRIVER;
 
-    $selectSql = "SELECT * FROM " . escapeIdentifier($collection, $_DB_DRIVER ?? 'mysql');
+    $selectSql = "SELECT * FROM " . escapeIdentifier($collection);
     $whereParams = [];
     $whereClause = buildWhere($search, $whereParams);
 
@@ -425,7 +417,7 @@ function remove(array $params, bool $one = false): array
     $deletedDocs = [];
 
     foreach ($matchingDocs as $doc) {
-        $deleteSql = "DELETE FROM " . escapeIdentifier($collection, $_DB_DRIVER ?? 'mysql') . " WHERE " . escapeIdentifier('_id', $_DB_DRIVER ?? 'mysql') . " = ?";
+        $deleteSql = "DELETE FROM " . escapeIdentifier($collection) . " WHERE " . escapeIdentifier('_id') . " = ?";
         db_execute($deleteSql, [$doc['_id']]);
         $deletedDocs[] = $doc;
     }

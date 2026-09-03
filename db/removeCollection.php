@@ -5,7 +5,7 @@ require_once __DIR__ . '/../utils/utils.php';
 
 function removeCollection(string $collection): bool
 {
-    $sql = 'DROP TABLE IF EXISTS ' . escapeIdentifier($collection, 'mysql');
+    $sql = 'DROP TABLE IF EXISTS ' . escapeIdentifier($collection);
     return db_execute($sql, []);
 }
 
