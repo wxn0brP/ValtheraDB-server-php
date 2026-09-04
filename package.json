@@ -1,6 +1,6 @@
 {
   "dependencies": {},
   "devDependencies": {
-    "@wxn0brp/db-client": "^0.112.1"
+    "@wxn0brp/db-client": "^0.120.0"
   }
 }
