@@ -1,7 +1,7 @@
 {
     "dependencies": {},
     "devDependencies": {
-        "@wxn0brp/db-client": "^0.120.9",
+        "@wxn0brp/db-client": "^0.130.0",
         "@wxn0brp/db-core": "^0.12.14"
     }
 }
